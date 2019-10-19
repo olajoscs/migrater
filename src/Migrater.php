@@ -67,6 +67,10 @@ class Migrater
     public function migrate(): void
     {
         $this->bootstrap();
+
+        foreach ($this->migrations as $migration) {
+            $this->perform($migration);
+        }
     }
 
 
@@ -101,5 +105,56 @@ class Migrater
                 $this->migrationTableName
             )
         );
+    }
+
+
+    private function perform(Migration $migration): void
+    {
+        $migration->up();
+        $this->insertIfNotExists($migration);
+        $this->markAsExecuted($migration);
+    }
+
+
+    private function insertIfNotExists(Migration $migration): void
+    {
+        $exists = $this->pdo->prepare(
+            sprintf(
+                'select id 
+                from %s 
+                where name = :name',
+                $this->migrationTableName
+            ),
+            [
+                'name' => $migration->getKey(),
+            ]
+        )->fetchAll();
+
+        if (\count($exists) === 0) {
+            $this->pdo->prepare(
+                sprintf(
+                    'insert into %s (name, created, executed)
+                     values (:name, now(), false)',
+                    $this->migrationTableName
+                )
+            )->execute([
+                'name' => $migration->getKey(),
+            ]);
+        }
+    }
+
+
+    private function markAsExecuted(Migration $migration): void
+    {
+        $this->pdo->prepare(
+            sprintf(
+                'update %s
+                set executed = true 
+                where name = :name',
+                $this->migrationTableName
+            )
+        )->execute([
+            'name' => $migration->getKey(),
+        ]);
     }
 }
