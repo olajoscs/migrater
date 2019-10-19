@@ -56,13 +56,23 @@ abstract class MigraterTest extends TestCase
             );
         }
 
-        return new \PDO($dsn, getenv('DB_USER'), getenv('DB_PASSWORD'));
+        $pdo = new \PDO($dsn, getenv('DB_USER'), getenv('DB_PASSWORD'));
+
+        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        return $pdo;
     }
 
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->migrater = new Migrater();
+        $this->migrater = new Migrater('migrations', $this->pdo);
+    }
+
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+        $this->pdo->exec('drop table if exists migrations');
     }
 }
