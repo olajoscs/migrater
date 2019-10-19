@@ -31,13 +31,14 @@ class MigraterMigrateTest extends MigraterTest
     {
         $migration1 = new ExampleMigration1($this->pdo);
         $this->migrater->register($migration1);
-        $this->migrater->migrate();
+        $migrated = $this->migrater->migrate();
 
         $statement = $this->pdo->prepare('select * from migrations where name = :name');
         $statement->execute(['name' => $migration1->getKey()]);
         $rows = $statement->fetchAll(\PDO::FETCH_OBJ);
         $row = reset($rows);
 
+        $this->assertCount(1, $migrated);
         $this->assertTrue((bool)$row->executed);
     }
 
