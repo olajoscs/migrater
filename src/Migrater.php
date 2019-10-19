@@ -89,7 +89,7 @@ class Migrater
         try {
             $result = $this->pdo->query(sprintf('select 1 from %s', $this->migrationTableName));
         } catch (\PDOException $exception) {
-            if ((string)$exception->getCode() === '42S02') {
+            if ($exception->getCode() === '42S02') {
                 $result = false;
             } else {
                 throw $exception;
@@ -161,17 +161,20 @@ class Migrater
 
     private function insertIfNotExists(Migration $migration): void
     {
-        $exists = $this->pdo->prepare(
+        $statement = $this->pdo->prepare(
             sprintf(
                 'select id 
                 from %s 
                 where name = :name',
                 $this->migrationTableName
-            ),
-            [
-                'name' => $migration->getKey(),
-            ]
-        )->fetchAll();
+            )
+        );
+
+        $statement->execute([
+            'name' => $migration->getKey(),
+        ]);
+
+        $exists = $statement->fetchAll();
 
         if (\count($exists) === 0) {
             $this->pdo->prepare(
