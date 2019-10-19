@@ -1,0 +1,30 @@
+{
+    "name": "olajoscs/migrater",
+    "description": "A lightweigth database migration tool",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^7.1",
+        "ext-pdo": "*",
+        "infection/infection": "^0.13.6"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^7.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "OlajosCs\\Migrater\\": "./src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "OlajosCs\\Migrater\\Tests\\": "./tests"
+        }
+    },
+    "authors": [
+        {
+            "name": "Csaba Olajos",
+            "email": "olajoscs@gmail.com"
+        }
+    ]
+}
