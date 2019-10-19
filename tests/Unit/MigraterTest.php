@@ -66,6 +66,7 @@ abstract class MigraterTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->pdo->exec('drop table if exists migrations');
         $this->migrater = new Migrater('migrations', $this->pdo);
     }
 
@@ -73,6 +74,5 @@ abstract class MigraterTest extends TestCase
     protected function tearDown(): void
     {
         parent::tearDown();
-        $this->pdo->exec('drop table if exists migrations');
     }
 }

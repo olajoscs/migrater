@@ -21,6 +21,11 @@ class Migrater
      */
     private $pdo;
 
+    /**
+     * @var object[]
+     */
+    private $existingMigrations = [];
+
 
     public function __construct(string $migrationTableName, \PDO $pdo)
     {
@@ -62,15 +67,20 @@ class Migrater
     /**
      * Migrate the missing migrations
      *
-     * @return void
+     * @return string[] The performed migrations
      */
-    public function migrate(): void
+    public function migrate(): array
     {
         $this->bootstrap();
 
+        $performed = [];
         foreach ($this->migrations as $migration) {
-            $this->perform($migration);
+            if ($this->perform($migration)) {
+                $performed[] = $migration->getKey();
+            }
         }
+
+        return $performed;
     }
 
 
@@ -89,6 +99,8 @@ class Migrater
         if ($result === false) {
             $this->createMigrationTable();
         }
+
+        $this->collectExistingMigrations();
     }
 
 
@@ -108,11 +120,42 @@ class Migrater
     }
 
 
-    private function perform(Migration $migration): void
+    private function collectExistingMigrations(): void
     {
+        $rows = $this->pdo->query(
+            sprintf(
+                'select * from %s',
+                $this->migrationTableName
+            )
+        )->fetchAll(\PDO::FETCH_OBJ);
+
+        foreach ($rows as $row) {
+            $this->existingMigrations[$row->name] = $row;
+        }
+    }
+
+
+    private function perform(Migration $migration): bool
+    {
+        if (!$this->shouldPerform($migration)) {
+            return false;
+        }
+
         $migration->up();
         $this->insertIfNotExists($migration);
         $this->markAsExecuted($migration);
+
+        return true;
+    }
+
+
+    private function shouldPerform(Migration $migration): bool
+    {
+        if (!isset($this->existingMigrations[$migration->getKey()])) {
+            return true;
+        }
+
+        return !$this->existingMigrations[$migration->getKey()]->executed;
     }
 
 
