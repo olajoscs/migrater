@@ -8,7 +8,7 @@ class MigrationTableCreationTest extends MigraterTest
 {
     public function test_migrations_table_created(): void
     {
-        $this->migrater->migrate();
+        $this->migrater->migrateAll();
 
         $this->assertEmpty($this->pdo->query('select * from migrations')->fetchAll());
     }

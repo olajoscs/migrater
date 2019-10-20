@@ -5,32 +5,23 @@ declare(strict_types=1);
 namespace OlajosCs\Migrater;
 
 /**
- * Interface Migration
+ * Class AbstractMigration
  *
- * The behavior of the migration entities
+ * Default parent for migrations which provides a PDO instance
  */
-interface Migration
+abstract class Migration implements MigrationContract
 {
-    /**
-     * Actions for building
-     *
-     * @return void
-     */
-    public function up(): void;
+    protected $pdo;
 
 
-    /**
-     * Actions for reverting
-     *
-     * @return void
-     */
-    public function down(): void;
+    public function __construct(\PDO $pdo)
+    {
+        $this->pdo = $pdo;
+    }
 
 
-    /**
-     * Return a unique key for this migration
-     *
-     * @return string
-     */
-    public function getKey(): string;
+    public function getKey(): string
+    {
+        return static::class;
+    }
 }

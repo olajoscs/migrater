@@ -7,7 +7,7 @@ namespace OlajosCs\Migrater;
 class Migrater
 {
     /**
-     * @var Migration[]
+     * @var MigrationContract[]
      */
     private $migrations = [];
 
@@ -37,26 +37,68 @@ class Migrater
     /**
      * Register a migration
      *
-     * @param Migration $migration
+     * @param MigrationContract[] $migrations
      *
      * @return void
      */
-    public function register(Migration $migration): void
+    public function register(MigrationContract ...$migrations): void
     {
-        $key = $migration->getKey();
+        foreach ($migrations as $migration) {
+            $key = $migration->getKey();
 
-        if (isset($this->migrations[$key])) {
-            throw new MigraterException('Migration already registered: ' . $key);
+            if (isset($this->migrations[$key])) {
+                throw new MigraterException('Migration already registered: ' . $key);
+            }
+
+            $this->migrations[$key] = $migration;
+        }
+    }
+
+
+    /**
+     * Rollback the last registered and executed migration
+     *
+     * @return string|null The key of the rollbacked migration
+     */
+    public function rollback(): ?string
+    {
+        $this->bootstrap();
+
+        $migrations = array_filter($this->existingMigrations, function(\stdClass $migration) {
+            return $migration->executed;
+        });
+
+        uasort($migrations, function (\stdClass $migration1, \stdClass $migration2) {
+            $createdDifference = $migration2->created <=> $migration1->created;
+
+            if ($createdDifference !== 0) {
+                return $createdDifference;
+            }
+
+            return $migration2->id <=> $migration1;
+        });
+
+        $rollbackableStdclass = array_shift($migrations);
+
+        if ($rollbackableStdclass === null) {
+            return null;
         }
 
-        $this->migrations[$key] = $migration;
+        $className = $rollbackableStdclass->name;
+        $rollbackable = new $className($this->pdo);
+
+        if (!isset($this->migrations[$rollbackable->getKey()])) {
+            return null;
+        }
+
+        return $this->performRollback($rollbackable);
     }
 
 
     /**
      * Return all the registered migration
      *
-     * @return Migration[]
+     * @return MigrationContract[]
      */
     public function getMigrations(): array
     {
@@ -65,22 +107,49 @@ class Migrater
 
 
     /**
+     * Migrate the migrations and return the keys in an array
+     *
+     * @return string[] Keys of the migrated migrations
+     */
+    public function migrateAll(): array
+    {
+        $migratedNames = [];
+        foreach ($this->migrate() as $migrated) {
+            $migratedNames[] = $migrated;
+        }
+
+        return $migratedNames;
+    }
+
+
+    /**
      * Migrate the missing migrations
      *
-     * @return string[] The performed migrations
+     * @return \Generator|string[] The performed migrations
      */
-    public function migrate(): array
+    public function migrate(): \Generator
     {
         $this->bootstrap();
 
-        $performed = [];
+        $migrations = array_filter($this->existingMigrations, function(\stdClass $migration) {
+            return $migration->executed === false;
+        });
+
+        uasort($migrations, function (\stdClass $migration1, \stdClass $migration2) {
+            $createdDifference = $migration2->created <=> $migration1->created;
+
+            if ($createdDifference !== 0) {
+                return $createdDifference;
+            }
+
+            return $migration2->id <=> $migration1;
+        });
+
         foreach ($this->migrations as $migration) {
             if ($this->perform($migration)) {
-                $performed[] = $migration->getKey();
+                yield $migration->getKey();
             }
         }
-
-        return $performed;
     }
 
 
@@ -124,7 +193,7 @@ class Migrater
     {
         $rows = $this->pdo->query(
             sprintf(
-                'select * from %s',
+                'select * from %s order by created desc, id desc',
                 $this->migrationTableName
             )
         )->fetchAll(\PDO::FETCH_OBJ);
@@ -135,7 +204,7 @@ class Migrater
     }
 
 
-    private function perform(Migration $migration): bool
+    private function perform(MigrationContract $migration): bool
     {
         if (!$this->shouldPerform($migration)) {
             return false;
@@ -149,7 +218,16 @@ class Migrater
     }
 
 
-    private function shouldPerform(Migration $migration): bool
+    private function performRollback(MigrationContract $migration): string
+    {
+        $migration->down();
+        $this->markAsNotExecuted($migration);
+
+        return $migration->getKey();
+    }
+
+
+    private function shouldPerform(MigrationContract $migration): bool
     {
         if (!isset($this->existingMigrations[$migration->getKey()])) {
             return true;
@@ -159,7 +237,7 @@ class Migrater
     }
 
 
-    private function insertIfNotExists(Migration $migration): void
+    private function insertIfNotExists(MigrationContract $migration): void
     {
         $statement = $this->pdo->prepare(
             sprintf(
@@ -190,7 +268,7 @@ class Migrater
     }
 
 
-    private function markAsExecuted(Migration $migration): void
+    private function markAsExecuted(MigrationContract $migration): void
     {
         $this->pdo->prepare(
             sprintf(
@@ -202,5 +280,22 @@ class Migrater
         )->execute([
             'name' => $migration->getKey(),
         ]);
+    }
+
+
+    private function markAsNotExecuted(MigrationContract $migration): void
+    {
+        $this->pdo->prepare(
+            sprintf(
+                'update %s
+                set executed = false 
+                where name = :name',
+                $this->migrationTableName
+            )
+        )->execute([
+            'name' => $migration->getKey(),
+        ]);
+
+        $this->existingMigrations[$migration->getKey()]->executed = false;
     }
 }

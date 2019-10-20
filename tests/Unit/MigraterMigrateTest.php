@@ -11,7 +11,7 @@ class MigraterMigrateTest extends MigraterTest
         $migration1 = new ExampleMigration1($this->pdo);
 
         $this->migrater->register($migration1);
-        $this->migrater->migrate();
+        $this->migrater->migrateAll();
 
         $this->assertCount(0, $this->pdo->query('select * from examples_1'));
     }
@@ -21,7 +21,7 @@ class MigraterMigrateTest extends MigraterTest
     {
         $migration1 = new ExampleMigration1($this->pdo);
         $this->migrater->register($migration1);
-        $this->migrater->migrate();
+        $this->migrater->migrateAll();
 
         $this->assertCount(1, $this->pdo->query('select * from migrations')->fetchAll());
     }
@@ -31,7 +31,7 @@ class MigraterMigrateTest extends MigraterTest
     {
         $migration1 = new ExampleMigration1($this->pdo);
         $this->migrater->register($migration1);
-        $migrated = $this->migrater->migrate();
+        $migrated = $this->migrater->migrateAll();
 
         $statement = $this->pdo->prepare('select * from migrations where name = :name');
         $statement->execute(['name' => $migration1->getKey()]);
@@ -63,9 +63,41 @@ class MigraterMigrateTest extends MigraterTest
         $statement->execute(['name' => $migration1->getKey()]);
 
         $this->migrater->register($migration1);
-        $migrated = $this->migrater->migrate();
+        $migrated = $this->migrater->migrateAll();
 
         $this->assertCount(0, $migrated);
+    }
+
+
+    public function test_migrate_order_1(): void
+    {
+        $migration1 = new ExampleMigration1($this->pdo);
+        $migration2 = new ExampleMigration2($this->pdo);
+        $this->migrater->register($migration1, $migration2);
+        $migrated = $this->migrater->migrateAll();
+
+        $expected = [
+            ExampleMigration1::class,
+            ExampleMigration2::class,
+        ];
+
+        $this->assertEquals($expected, $migrated);
+    }
+
+
+    public function test_migrate_order_2(): void
+    {
+        $migration1 = new ExampleMigration2($this->pdo);
+        $migration2 = new ExampleMigration1($this->pdo);
+        $this->migrater->register($migration1, $migration2);
+        $migrated = $this->migrater->migrateAll();
+
+        $expected = [
+            ExampleMigration2::class,
+            ExampleMigration1::class,
+        ];
+
+        $this->assertEquals($expected, $migrated);
     }
 
 
@@ -73,6 +105,7 @@ class MigraterMigrateTest extends MigraterTest
     {
         parent::setUp();
 
-        $this->pdo->query('drop table if exists examples_1');
+        $this->pdo->exec('drop table if exists examples_1');
+        $this->pdo->exec('drop table if exists examples_2');
     }
 }

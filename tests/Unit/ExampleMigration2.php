@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace OlajosCs\Migrater\Tests\Unit;
 
-use OlajosCs\Migrater\AbstractMigration;
+use OlajosCs\Migrater\Migration;
 
-class ExampleMigration2 extends AbstractMigration
+class ExampleMigration2 extends Migration
 {
     public function up(): void
     {
