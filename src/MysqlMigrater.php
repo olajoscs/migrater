@@ -56,7 +56,7 @@ class MysqlMigrater implements DatabaseMigrater
                 'select * from %s order by created desc, id desc',
                 $this->tableName
             )
-        )->fetchAll(\PDO::FETCH_OBJ);
+        )->fetchAll($this->pdo::FETCH_OBJ);
     }
 
 
@@ -75,10 +75,10 @@ class MysqlMigrater implements DatabaseMigrater
             'name' => $migration->getKey(),
         ]);
 
-        $exists = $statement->fetchAll();
+        $exists = $statement->fetchAll($this->pdo::FETCH_OBJ);
 
         if (\count($exists) > 0) {
-            return reset($exists)->id;
+            return (int)reset($exists)->id;
         }
 
         $this->pdo->prepare(

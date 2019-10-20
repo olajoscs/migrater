@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace OlajosCs\Migrater\Tests\Unit;
 
+use OlajosCs\Migrater\MigraterFactory;
+
 class MigraterMigrateTest extends MigraterTest
 {
     public function test_migration_is_done(): void
@@ -98,5 +100,40 @@ class MigraterMigrateTest extends MigraterTest
         ];
 
         $this->assertEquals($expected, $migrated);
+    }
+
+
+    public function test_migration_is_not_duplicated(): void
+    {
+        $this->migrater->register(new ExampleMigration1($this->pdo));
+        $this->migrater->migrateAll();
+
+        $migrater = (new MigraterFactory())->create($this->pdo, 'migrations');
+        $migrater->register(
+            new ExampleMigration1($this->pdo),
+            new ExampleMigration2($this->pdo)
+        );
+
+        $result = $migrater->migrateAll();
+
+        $this->assertEquals([ExampleMigration2::class], $result);
+    }
+
+
+    public function test_migration_insert_is_not_duplicated(): void
+    {
+        $this->migrater->register(new ExampleMigration1($this->pdo));
+        $this->migrater->migrateAll();
+        $this->migrater->resetAll();
+
+        $migrater = (new MigraterFactory())->create($this->pdo, 'migrations');
+        $migrater->register(
+            new ExampleMigration1($this->pdo),
+            new ExampleMigration2($this->pdo)
+        );
+
+        $result = $migrater->migrateAll();
+
+        $this->assertEquals([ExampleMigration1::class, ExampleMigration2::class], $result);
     }
 }
