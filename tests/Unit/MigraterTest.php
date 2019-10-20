@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OlajosCs\Migrater\Tests\Unit;
 
+use OlajosCs\Migrater\MigraterFactory;
 use OlajosCs\Migrater\Migrater;
 use PHPUnit\Framework\TestCase;
 
@@ -69,7 +70,9 @@ abstract class MigraterTest extends TestCase
         $this->pdo->exec('drop table if exists migrations');
         $this->pdo->exec('drop table if exists examples_1');
         $this->pdo->exec('drop table if exists examples_2');
-        $this->migrater = new Migrater('migrations', $this->pdo);
+
+        $factory = new MigraterFactory();
+        $this->migrater = $factory->create($this->pdo, 'migrations');
     }
 
 

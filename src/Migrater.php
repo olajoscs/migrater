@@ -12,25 +12,19 @@ class Migrater
     private $migrations = [];
 
     /**
-     * @var string
-     */
-    private $migrationTableName;
-
-    /**
-     * @var \PDO
-     */
-    private $pdo;
-
-    /**
      * @var object[]
      */
     private $existingMigrations = [];
 
+    /**
+     * @var DatabaseMigrater
+     */
+    private $databaseMigrater;
 
-    public function __construct(string $migrationTableName, \PDO $pdo)
+
+    public function __construct(DatabaseMigrater $databaseMigrater)
     {
-        $this->migrationTableName = $migrationTableName;
-        $this->pdo = $pdo;
+        $this->databaseMigrater = $databaseMigrater;
     }
 
 
@@ -85,7 +79,8 @@ class Migrater
         }
 
         $className = $rollbackableStdclass->name;
-        $rollbackable = new $className($this->pdo);
+        /** @var MigrationContract $rollbackable */
+        $rollbackable = new $className($this->databaseMigrater->getPdo());
 
         if (!isset($this->migrations[$rollbackable->getKey()])) {
             return null;
@@ -198,7 +193,7 @@ class Migrater
             }
 
             $migrationClass = $migrationStdclass->name;
-            $migration = new $migrationClass($this->pdo);
+            $migration = new $migrationClass($this->databaseMigrater->getPdo());
 
             yield $this->performRollback($migration);
         }
@@ -207,50 +202,14 @@ class Migrater
 
     private function bootstrap(): void
     {
-        try {
-            $result = $this->pdo->query(sprintf('select 1 from %s', $this->migrationTableName));
-        } catch (\PDOException $exception) {
-            if ($exception->getCode() === '42S02') {
-                $result = false;
-            } else {
-                throw $exception;
-            }
-        }
-
-        if ($result === false) {
-            $this->createMigrationTable();
-        }
-
+        $this->databaseMigrater->createMigrationsTable();
         $this->collectExistingMigrations();
-    }
-
-
-    private function createMigrationTable(): void
-    {
-        $this->pdo->exec(
-            sprintf(
-                'create table %s (
-                  id int primary key auto_increment,
-                  name varchar(255) not null,
-                  created timestamp not null,
-                  executed bool default false
-                )',
-                $this->migrationTableName
-            )
-        );
     }
 
 
     private function collectExistingMigrations(): void
     {
-        $rows = $this->pdo->query(
-            sprintf(
-                'select * from %s order by created desc, id desc',
-                $this->migrationTableName
-            )
-        )->fetchAll(\PDO::FETCH_OBJ);
-
-        foreach ($rows as $row) {
+        foreach ($this->databaseMigrater->collectMigrations() as $row) {
             $this->existingMigrations[$row->name] = $row;
         }
     }
@@ -263,8 +222,8 @@ class Migrater
         }
 
         $migration->up();
-        $this->insertIfNotExists($migration);
-        $this->markAsExecuted($migration);
+        $this->databaseMigrater->insertMigration($migration);
+        $this->databaseMigrater->markAsExecuted($migration);
 
         return true;
     }
@@ -289,65 +248,9 @@ class Migrater
     }
 
 
-    private function insertIfNotExists(MigrationContract $migration): void
-    {
-        $statement = $this->pdo->prepare(
-            sprintf(
-                'select id 
-                from %s 
-                where name = :name',
-                $this->migrationTableName
-            )
-        );
-
-        $statement->execute([
-            'name' => $migration->getKey(),
-        ]);
-
-        $exists = $statement->fetchAll();
-
-        if (\count($exists) === 0) {
-            $this->pdo->prepare(
-                sprintf(
-                    'insert into %s (name, created, executed)
-                     values (:name, now(), false)',
-                    $this->migrationTableName
-                )
-            )->execute([
-                'name' => $migration->getKey(),
-            ]);
-        }
-    }
-
-
-    private function markAsExecuted(MigrationContract $migration): void
-    {
-        $this->pdo->prepare(
-            sprintf(
-                'update %s
-                set executed = true 
-                where name = :name',
-                $this->migrationTableName
-            )
-        )->execute([
-            'name' => $migration->getKey(),
-        ]);
-    }
-
-
     private function markAsNotExecuted(MigrationContract $migration): void
     {
-        $this->pdo->prepare(
-            sprintf(
-                'update %s
-                set executed = false 
-                where name = :name',
-                $this->migrationTableName
-            )
-        )->execute([
-            'name' => $migration->getKey(),
-        ]);
-
+        $this->databaseMigrater->markAsNotExecuted($migration);
         $this->existingMigrations[$migration->getKey()]->executed = false;
     }
 }
