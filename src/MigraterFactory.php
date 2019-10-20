@@ -18,7 +18,7 @@ class MigraterFactory
      * @param string $tableName
      *
      * @return Migrater
-     * @throws \Exception
+     * @throws MigraterException If required database implementation is missing
      */
     public function create(\PDO $pdo, string $tableName): Migrater
     {
