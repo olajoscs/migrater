@@ -99,13 +99,4 @@ class MigraterMigrateTest extends MigraterTest
 
         $this->assertEquals($expected, $migrated);
     }
-
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->pdo->exec('drop table if exists examples_1');
-        $this->pdo->exec('drop table if exists examples_2');
-    }
 }

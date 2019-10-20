@@ -153,6 +153,58 @@ class Migrater
     }
 
 
+    /**
+     * Rollback all the last migrations which were registered, then return their keys in an array
+     *
+     * @return string[] Keys of rollbacked migrations
+     */
+    public function resetAll(): array
+    {
+        $migrationNames = [];
+        foreach ($this->reset() as $migration) {
+            $migrationNames[] = $migration;
+        }
+
+        return $migrationNames;
+    }
+
+
+    /**
+     * Rollback all the last migrations which were registered
+     *
+     * @return \Generator|string[]
+     */
+    public function reset(): \Generator
+    {
+        $this->bootstrap();
+
+        $migrations = array_filter($this->existingMigrations, function(\stdClass $migration) {
+            return $migration->executed;
+        });
+
+        uasort($migrations, function (\stdClass $migration1, \stdClass $migration2) {
+            $createdDifference = $migration2->created <=> $migration1->created;
+
+            if ($createdDifference !== 0) {
+                return $createdDifference;
+            }
+
+            return $migration2->id <=> $migration1;
+        });
+
+        foreach ($migrations as $migrationStdclass) {
+            if (!isset($this->migrations[$migrationStdclass->name])) {
+                continue;
+            }
+
+            $migrationClass = $migrationStdclass->name;
+            $migration = new $migrationClass($this->pdo);
+
+            yield $this->performRollback($migration);
+        }
+    }
+
+
     private function bootstrap(): void
     {
         try {

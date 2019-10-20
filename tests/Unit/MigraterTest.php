@@ -67,6 +67,8 @@ abstract class MigraterTest extends TestCase
     {
         parent::setUp();
         $this->pdo->exec('drop table if exists migrations');
+        $this->pdo->exec('drop table if exists examples_1');
+        $this->pdo->exec('drop table if exists examples_2');
         $this->migrater = new Migrater('migrations', $this->pdo);
     }
 
